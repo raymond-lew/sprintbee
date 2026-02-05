@@ -1,0 +1,9 @@
+ollama
+streamlit
+langchain-ollama
+chromadb
+langchain-community
+pymupdf
+pyttsx3
+gtts
+pygame
