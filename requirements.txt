@@ -1,6 +1,6 @@
-ollama
+openai
 streamlit
-langchain-ollama
+langchain-openai
 chromadb
 langchain-community
 pymupdf

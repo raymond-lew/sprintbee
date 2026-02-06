@@ -2,8 +2,8 @@ import streamlit as st
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-from langchain_ollama import OllamaEmbeddings
-import ollama
+from langchain_openai import OpenAIEmbeddings
+from openai import OpenAI
 import re
 import os
 import tempfile
@@ -14,6 +14,11 @@ def summarize_pdf(uploaded_file):
     """Summarizes the content of the uploaded PDF file."""
     if uploaded_file is None:
         return "Please upload a PDF file to summarize it."
+
+    # Check if API key is available
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return "Please enter your OpenAI API key to generate a summary."
 
     try:
         # Save the uploaded file temporarily
@@ -35,12 +40,15 @@ The summary should capture the main points and key information.
 Document:
 {full_text[:4000]}"""  # Use first 4000 chars to avoid token limits
 
-        response = ollama.chat(
-            model="llama3.2:3b",
+        # Initialize OpenAI client
+        client = OpenAI(api_key=api_key)
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": summary_prompt}],
         )
 
-        summary = response["message"]["content"]
+        summary = response.choices[0].message.content
         # Remove thinking tags if present
         summary = re.sub(r"\[THOUGHT\].*?\[/THOUGHT\]", "", summary, flags=re.DOTALL).strip()
 
@@ -80,64 +88,75 @@ def get_binary_file_downloader_html(bin_file, file_label='File'):
     return href
 
 
+# Initialize session state to store summary
+if 'pdf_summary' not in st.session_state:
+    st.session_state.pdf_summary = ""
+
 # Streamlit UI
 st.set_page_config(page_title="Beesprint", layout="wide")
-st.title("Beesprint")
+st.markdown("<h1 style='color: orange;'>Beesprint</h1>", unsafe_allow_html=True)
+
+# API Key input
+api_key = st.text_input("Enter your OpenAI API Key", type="password")
+if api_key:
+    os.environ["OPENAI_API_KEY"] = api_key
+
 st.markdown("Upload a PDF file to get a summary and listen to it!")
 
-# Create tabs for different functionalities
-tab1, tab2 = st.tabs(["📝 Summary", "🔊 Audio Summary"])
+# Create columns for side-by-side display
+col1, col2 = st.columns(2)
 
-with tab1:
-    st.header("Get PDF Summary")
-    pdf_file_summary = st.file_uploader("Upload PDF for Summary", type=['pdf'], key="summary")
+# Store audio path in session state
+if 'audio_path' not in st.session_state:
+    st.session_state.audio_path = None
 
-    if st.button("Generate Summary", key="btn_summary"):
-        if pdf_file_summary is not None:
-            with st.spinner("Generating summary..."):
-                summary = summarize_pdf(pdf_file_summary)
-                st.text_area("Summary:", value=summary, height=300)
+with col1:
+    st.header("📝 Summary")
+    pdf_file = st.file_uploader("Upload PDF for Summary", type=['pdf'], key="summary_upload")
+
+    if st.button("Generate Summary & Audio", key="btn_both"):
+        if pdf_file is not None:
+            # Check if API key is provided before processing
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                st.error("Please enter your OpenAI API key to generate a summary.")
+            else:
+                with st.spinner("Processing PDF..."):
+                    # Generate summary
+                    st.session_state.pdf_summary = summarize_pdf(pdf_file)
+
+                    # Display summary in text area
+                    st.text_area("Summary:", value=st.session_state.pdf_summary, height=400)
+
+                    # Automatically generate audio as well
+                    with st.spinner("Generating audio..."):
+                        # Clean summary of asterisks and other markdown characters for audio
+                        cleaned_summary = st.session_state.pdf_summary.replace('*', '').replace('#', '').replace('_', '').replace('-', '').replace('/', '')
+
+                        # Generate audio
+                        st.session_state.audio_path = text_to_speech(cleaned_summary)
+
+                        if st.session_state.audio_path:
+                            st.success("Audio generated successfully!")
+                        else:
+                            st.error("Failed to generate audio. Please try again.")
         else:
             st.warning("Please upload a PDF file first.")
 
-with tab2:
-    st.header("Get Audio Summary")
-    pdf_file_audio = st.file_uploader("Upload PDF for Audio Summary", type=['pdf'], key="audio")
+with col2:
+    st.header("🔊 Audio Summary")
+    
+    # Show audio player if audio exists
+    if st.session_state.audio_path:
+        # Read the audio file and encode it for display
+        with open(st.session_state.audio_path, "rb") as audio_file:
+            audio_bytes = audio_file.read()
 
-    if st.button("Generate Audio Summary", key="btn_audio"):
-        if pdf_file_audio is not None:
-            with st.spinner("Processing PDF..."):
-                # Generate summary
-                summary = summarize_pdf(pdf_file_audio)
+        st.audio(audio_bytes, format='audio/mp3')
 
-                # Clean summary of asterisks and other markdown characters for audio
-                cleaned_summary = summary.replace('*', '').replace('#', '').replace('_', '').replace('-', '')
-
-                st.text_area("Summary:", value=cleaned_summary, height=300)
-
-                # Generate audio
-                with st.spinner("Generating audio..."):
-                    audio_path = text_to_speech(cleaned_summary)
-
-                    if audio_path:
-                        # Display audio player
-                        st.success("Audio generated successfully!")
-
-                        # Read the audio file and encode it for display
-                        with open(audio_path, "rb") as audio_file:
-                            audio_bytes = audio_file.read()
-
-                        st.audio(audio_bytes, format='audio/mp3')
-
-                        # Provide download link
-                        st.markdown(get_binary_file_downloader_html(audio_path, 'Audio Summary.mp3'), unsafe_allow_html=True)
-
-                        # Option to clean up the temporary file after use
-                        # os.unlink(audio_path)  # Uncomment if you want to delete after serving
-                    else:
-                        st.error("Failed to generate audio. Please try again.")
-        else:
-            st.warning("Please upload a PDF file first.")
+        # Provide download link
+        st.markdown(get_binary_file_downloader_html(st.session_state.audio_path, 'Audio Summary.mp3'), unsafe_allow_html=True)
+    
 
 # Add some styling
 st.markdown("""
