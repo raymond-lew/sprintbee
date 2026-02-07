@@ -101,7 +101,7 @@ api_key = st.text_input("Enter your OpenAI API Key", type="password")
 if api_key:
     os.environ["OPENAI_API_KEY"] = api_key
 
-st.markdown("Upload a PDF file to get a summary and listen to it!")
+st.markdown("Simply upload your PDF file to automatically generate a concise summary and then listen to the high-quality audio narration of the content.")
 
 # Create columns for side-by-side display
 col1, col2 = st.columns(2)
