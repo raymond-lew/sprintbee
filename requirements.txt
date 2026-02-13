@@ -1,4 +1,4 @@
-openai
+groq
 streamlit
 langchain-openai
 chromadb
@@ -7,3 +7,4 @@ pymupdf
 pyttsx3
 gtts
 pygame
+python-dotenv

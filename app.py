@@ -3,22 +3,26 @@ from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
-from openai import OpenAI
+from groq import Groq
 import re
 import os
 import tempfile
 from gtts import gTTS
 import base64
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 def summarize_pdf(uploaded_file):
     """Summarizes the content of the uploaded PDF file."""
     if uploaded_file is None:
         return "Please upload a PDF file to summarize it."
 
-    # Check if API key is available
-    api_key = os.getenv("OPENAI_API_KEY")
+    # Get API key from environment variable
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        return "Please enter your OpenAI API key to generate a summary."
+        return "Error: GROQ_API_KEY not found in environment variables."
 
     try:
         # Save the uploaded file temporarily
@@ -40,11 +44,11 @@ The summary should capture the main points and key information.
 Document:
 {full_text[:4000]}"""  # Use first 4000 chars to avoid token limits
 
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
+        # Initialize Groq client
+        client = Groq(api_key=api_key)
 
         response = client.chat.completions.create(
-            model="gpt-5",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": summary_prompt}],
         )
 
@@ -96,10 +100,7 @@ if 'pdf_summary' not in st.session_state:
 st.set_page_config(page_title="Beesprint", layout="wide")
 st.markdown("<h1 style='color: orange;'>Beesprint</h1>", unsafe_allow_html=True)
 
-# API Key input
-api_key = st.text_input("Enter your OpenAI API Key", type="password")
-if api_key:
-    os.environ["OPENAI_API_KEY"] = api_key
+
 
 st.markdown("Simply upload your PDF file to automatically generate a concise summary and then listen to the high-quality audio narration of the content.")
 
@@ -116,16 +117,14 @@ with col1:
 
     if st.button("Generate Summary & Audio", key="btn_both"):
         if pdf_file is not None:
-            # Check if API key is provided before processing
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                st.error("Please enter your OpenAI API key to generate a summary.")
-            else:
-                with st.spinner("Processing PDF..."):
-                    # Generate summary
-                    st.session_state.pdf_summary = summarize_pdf(pdf_file)
+            with st.spinner("Processing PDF..."):
+                # Generate summary
+                st.session_state.pdf_summary = summarize_pdf(pdf_file)
 
-                    # Display summary in text area
+                # Display summary in text area
+                if "Error:" in st.session_state.pdf_summary and "GROQ_API_KEY" in st.session_state.pdf_summary:
+                    st.error(st.session_state.pdf_summary)
+                else:
                     st.text_area("Summary:", value=st.session_state.pdf_summary, height=400)
 
                     # Automatically generate audio as well
