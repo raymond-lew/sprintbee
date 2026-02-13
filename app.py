@@ -44,7 +44,7 @@ Document:
         client = OpenAI(api_key=api_key)
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt5-mini",
             messages=[{"role": "user", "content": summary_prompt}],
         )
 
