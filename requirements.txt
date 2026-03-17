@@ -3,7 +3,7 @@ streamlit
 langchain-openai
 chromadb
 langchain-community
-pymupdf
+PyMuPDF
 pyttsx3
 gtts
 pygame
