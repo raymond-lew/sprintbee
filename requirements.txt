@@ -1,4 +1,4 @@
-groq
+openai
 streamlit
 langchain-openai
 chromadb

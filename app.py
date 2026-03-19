@@ -3,7 +3,7 @@ from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
-from groq import Groq
+from openai import OpenAI
 import re
 import os
 import tempfile
@@ -20,9 +20,9 @@ def summarize_pdf(uploaded_file):
         return "Please upload a PDF file to summarize it."
 
     # Get API key from environment variable
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        return "Error: GROQ_API_KEY not found in environment variables."
+        return "Error: OPENROUTER_API_KEY not found in environment variables."
 
     try:
         # Save the uploaded file temporarily
@@ -44,11 +44,14 @@ The summary should capture the main points and key information.
 Document:
 {full_text[:4000]}"""  # Use first 4000 chars to avoid token limits
 
-        # Initialize Groq client
-        client = Groq(api_key=api_key)
+        # Initialize OpenRouter client (OpenAI-compatible API)
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1"
+        )
 
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="meta-llama/llama-3-8b-instruct:free",
             messages=[{"role": "user", "content": summary_prompt}],
         )
 
@@ -122,7 +125,7 @@ with col1:
                 st.session_state.pdf_summary = summarize_pdf(pdf_file)
 
                 # Display summary in text area
-                if "Error:" in st.session_state.pdf_summary and "GROQ_API_KEY" in st.session_state.pdf_summary:
+                if "Error:" in st.session_state.pdf_summary and "OPENROUTER_API_KEY" in st.session_state.pdf_summary:
                     st.error(st.session_state.pdf_summary)
                 else:
                     st.text_area("Summary:", value=st.session_state.pdf_summary, height=400)
